@@ -24,7 +24,7 @@ namespace gh {
   struct IQueueWriter
   {
     virtual ~IQueueWriter() {}
-    virtual void push( shared_ptr<T> ) = 0;
+    virtual void push( std::shared_ptr<T> ) = 0;
   };
   // ----------------------------------------
 
@@ -34,7 +34,7 @@ namespace gh {
     virtual ~IQueueReader() {}
     virtual const bool empty() const = 0;
     virtual const size_t size() const = 0;
-    virtual shared_ptr<T> pop() = 0;
+    virtual std::shared_ptr<T> pop() = 0;
   };
   // ----------------------------------------
 
@@ -49,32 +49,25 @@ namespace gh {
     ConcurrentQueue( const ConcurrentQueue & ) = delete;
     ConcurrentQueue & operator= ( const ConcurrentQueue & ) = delete;
 
-    /* Concurrency-safe push to queue.
-     */
-    virtual void push( shared_ptr<T> val )
-    {
-      std::lock_guard<mutex> lk( _mutex );
-      _queue.push( val );
-      _cvar.notify_one();
-    }
-
     /* Concurrency-safe check if queue empty.
      */
     virtual const bool empty() const
     {
-      std::lock_guard<mutex> lk( _mutex );
+      std::lock_guard<std::mutex> lk( _mutex );
        return _queue.empty();
     }
 
     virtual const size_t size() const
     {
-      std::lock_guard<mutex> lk( _mutex );
+      std::lock_guard<std::mutex> lk( _mutex );
       return _queue.size();
     }
 
-    virtual void push( shared_ptr<T> val )
+    /* Concurrency-safe push to queue.
+     */
+    virtual void push( std::shared_ptr<T> val )
     {
-      std::lock_guard<mutex> lk( _mutex );
+      std::lock_guard<std::mutex> lk( _mutex );
       _queue.push( val );
       _cvar.notify_one();
     }
@@ -83,11 +76,12 @@ namespace gh {
      * the queue, then this method blocks the current thread until there
      * are.
      */
-    virtual shared_ptr<T> pop()
+    virtual std::shared_ptr<T> pop()
     {
-      std::unique_lock<mutex> lk( _mutex );
+      std::unique_lock<std::mutex> lk( _mutex );
       _cvar.wait( lk, [ this ] { return ! _queue.empty(); } );
-      auto value( _queue.front() );
+      auto value(
+      _queue.front() );
       _queue.pop();
       lk.unlock();
       _cvar.notify_all();
@@ -96,7 +90,7 @@ namespace gh {
 
   protected:
     mutable std::mutex _mutex;
-    queue<std::shared_ptr<T>> _queue;
+    std::queue<std::shared_ptr<T>> _queue;
     std::condition_variable _cvar;
   };
 
